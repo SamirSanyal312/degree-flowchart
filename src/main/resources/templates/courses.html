@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Courses</title>
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; margin: 2rem; }
+    table { border-collapse: collapse; width: 600px; }
+    th, td { border: 1px solid #ddd; padding: .5rem .75rem; }
+    th { background: #f5f5f5; text-align: left; }
+  </style>
+</head>
+<body>
+<h1>Courses</h1>
+
+<table>
+  <thead>
+  <tr>
+    <th>Code</th>
+    <th>Title</th>
+    <th>Credits</th>
+    <th>Core?</th>
+  </tr>
+  </thead>
+  <tbody>
+  <tr th:each="c : ${courses}">
+    <td th:text="${c.code}">CSCI-P100</td>
+    <td th:text="${c.title}">Applied Algorithms</td>
+    <td th:text="${c.credits}">3</td>
+    <td th:text="${c.core}">true</td>
+  </tr>
+  </tbody>
+</table>
+
+<p><a href="/flow">View flow-chart</a> &nbsp;|&nbsp; <a href="/prereqs">View prerequisites</a></p>
+<p><a href="/logout">Logout</a></p>
+</body>
+</html>

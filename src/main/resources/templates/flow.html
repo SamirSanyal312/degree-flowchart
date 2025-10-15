@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8" />
+  <title>Degree Flow</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+  <style>
+    :root{
+      --gap: 36px;
+      --col-w: 320px;
+      --row-h: 120px;
+      --pad: 24px;
+
+      --ok: #19b56f;
+      --ok-bg: #e7fbf2;
+
+      --eligible: #3b82f6;
+      --eligible-bg: #eaf1ff;
+
+      --danger: #ef4444;
+      --danger-bg: #fff2f2;
+
+      --card-bg: #ffffff;
+      --ink: #181818;
+      --muted: #636c76;
+      --ring: 1.5px;
+      --radius: 14px;
+      --shadow: 0 6px 24px rgba(0,0,0,.05);
+    }
+
+    body{
+      margin:0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      color: var(--ink);
+      background:#f7f7f9;
+    }
+
+    header{
+      padding: 22px var(--pad) 8px var(--pad);
+      display:flex; align-items:center; gap:24px; flex-wrap:wrap;
+    }
+    header h1{ font-size:28px; margin:0 24px 0 0; }
+    .legend{ display:flex; gap:22px; align-items:center; }
+    .lg{ display:inline-flex; align-items:center; gap:8px; color:#334155; }
+    .dot{ width:10px; height:10px; border-radius:50%; display:inline-block; }
+    .dot.ok{ background:var(--ok); }
+    .dot.eligible{ background:var(--eligible); }
+    .dot.locked{ background:var(--danger); }
+    .link{ color:#2563eb; text-decoration:none; }
+    .link:hover{ text-decoration:underline; }
+
+    /* --- board --- */
+    #board-wrap{
+      position:relative;
+      padding: 8px var(--pad) 40px var(--pad);
+    }
+    /* SVG sits behind cards but catches no mouse events */
+    #flow-canvas{
+      position:absolute; inset:0;
+      width:100%; height:100%;
+      pointer-events:none;
+      z-index:0;
+    }
+
+    #board{
+      position:relative;
+      display:grid;
+      grid-template-columns: repeat(auto-fill, minmax(var(--col-w), 1fr));
+      grid-auto-rows: var(--row-h);
+      gap: var(--gap);
+      z-index:1; /* above SVG */
+    }
+
+    .node{
+      position:relative;
+      background:var(--card-bg);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 18px 20px;
+      user-select:none;
+      cursor:grab;
+      border: var(--ring) solid transparent;
+    }
+    .node:active{ cursor:grabbing; }
+
+    .code{ font-weight:700; margin-bottom:10px; }
+    .title{ color:#111827; margin-bottom:10px; }
+    .meta{ color: var(--muted); font-size: 13px; }
+
+    /* status styles */
+    .status-completed{ border-color: var(--ok); background: var(--ok-bg); }
+    .status-eligible{  border-color: var(--eligible); background: var(--eligible-bg); }
+    .status-locked{    border-color: var(--danger); background: var(--danger-bg); }
+
+    /* edges */
+    .edge{
+      fill:none;
+      stroke:#9aa4b2;
+      stroke-width:2.25;
+      opacity:.9;
+    }
+    .edge.locked  { stroke: var(--danger); }
+    .edge.ok      { stroke: var(--ok); }
+    .edge.eligible{ stroke: var(--eligible); }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Degree Flow</h1>
+  <div class="legend">
+    <span class="lg"><span class="dot ok"></span>Completed</span>
+    <span class="lg"><span class="dot eligible"></span>Eligible</span>
+    <span class="lg"><span class="dot locked"></span>Locked</span>
+  </div>
+  <span style="flex:1"></span>
+  <a th:href="@{/courses}" class="link">Table view</a>
+  <a th:href="@{/logout}" class="link">Logout</a>
+</header>
+
+<div id="board-wrap">
+  <!-- SVG layer for arrows -->
+  <svg id="flow-canvas" viewBox="0 0 100 100" preserveAspectRatio="none">
+    <defs>
+      <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5"
+              markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#9aa4b2"></path>
+      </marker>
+      <marker id="arrow-ok" viewBox="0 0 10 10" refX="10" refY="5"
+              markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#19b56f"></path>
+      </marker>
+      <marker id="arrow-eligible" viewBox="0 0 10 10" refX="10" refY="5"
+              markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#3b82f6"></path>
+      </marker>
+      <marker id="arrow-locked" viewBox="0 0 10 10" refX="10" refY="5"
+              markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#ef4444"></path>
+      </marker>
+    </defs>
+  </svg>
+
+  <!-- Cards -->
+  <div id="board">
+    <div th:each="n : ${nodes}"
+         class="node"
+         th:classappend="' status-' + ${#strings.toLowerCase(n.status)}"
+         th:attr="data-code=${n.code}, data-status=${#strings.toLowerCase(n.status)}">
+      <div class="code"   th:text="${n.code}">CSCI-P100</div>
+      <div class="title"  th:text="${n.title}">Applied Algorithms</div>
+      <div class="meta">
+        <span th:text="${n.credits}">3</span> cr •
+        <span th:text="${n.core} ? 'Core' : 'Elective'">Core</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edges data (hidden) -->
+  <div id="edges" hidden>
+    <span th:each="e : ${edges}"
+          th:attr="data-from=${e.courseCode}, data-to=${e.requiresCode}"></span>
+  </div>
+</div>
+
+<script>
+(() => {
+  const svg   = document.getElementById('flow-canvas');
+  const board = document.getElementById('board');
+  const nodes = Array.from(board.querySelectorAll('.node'));
+  const edges = Array.from(document.querySelectorAll('#edges span'))
+                     .map(e => ({ from: e.dataset.from, to: e.dataset.to }));
+
+  // index nodes by course code
+  const byCode = Object.fromEntries(nodes.map(n => [n.dataset.code, n]));
+
+  // simple drag so you can rearrange quickly (keeps arrows in sync)
+  nodes.forEach(n => {
+    let start = null, origin = null;
+    n.addEventListener('mousedown', e => {
+      start = { x: e.clientX, y: e.clientY };
+      const r = n.getBoundingClientRect(), b = board.getBoundingClientRect();
+      origin = { x: r.left - b.left, y: r.top - b.top };
+      n.style.position = 'absolute';
+      n.style.left = origin.x + 'px';
+      n.style.top  = origin.y + 'px';
+      n.style.zIndex = 2;
+      window.addEventListener('mousemove', drag);
+      window.addEventListener('mouseup', up, { once: true });
+      e.preventDefault();
+    });
+    function drag(e){
+      const dx = e.clientX - start.x, dy = e.clientY - start.y;
+      n.style.left = (origin.x + dx) + 'px';
+      n.style.top  = (origin.y + dy) + 'px';
+      drawEdges();
+    }
+    function up(){
+      window.removeEventListener('mousemove', drag);
+      n.style.zIndex = 1;
+      drawEdges();
+    }
+  });
+
+  function sizeCanvas(){
+    const r = board.getBoundingClientRect();
+    svg.setAttribute('width',  r.width);
+    svg.setAttribute('height', r.height);
+    svg.setAttribute('viewBox', `0 0 ${r.width} ${r.height}`);
+  }
+
+  function center(el){
+    const r = el.getBoundingClientRect();
+    const b = board.getBoundingClientRect();
+    return { x: r.left - b.left + r.width/2, y: r.top - b.top + r.height/2 };
+  }
+
+  function edgeClassAndMarker(fromEl, toEl){
+    // choose color based on the *target* status; tweak if you prefer source
+    const st = (toEl?.dataset.status || 'locked');
+    if (st === 'completed') return { cls:'edge ok',       marker:'url(#arrow-ok)' };
+    if (st === 'eligible')  return { cls:'edge eligible', marker:'url(#arrow-eligible)' };
+    return                     { cls:'edge locked',   marker:'url(#arrow-locked)' };
+  }
+
+  function drawEdges(){
+    sizeCanvas();
+    // clear current
+    while (svg.lastChild) svg.removeChild(svg.lastChild);
+    // re-add defs (so markers remain after clearing)
+    const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+    defs.innerHTML = document.querySelector('#flow-canvas defs').innerHTML;
+    svg.appendChild(defs);
+
+    edges.forEach(e => {
+      const a = byCode[e.to];     // prerequisite node (from)
+      const b = byCode[e.from];   // course that requires it (to)
+      if (!a || !b) return;
+
+      const p1 = center(a);
+      const p2 = center(b);
+
+      // nice S curve between centers
+      const midY = (p1.y + p2.y) / 2;
+      const d = `M ${p1.x} ${p1.y} C ${p1.x} ${midY}, ${p2.x} ${midY}, ${p2.x} ${p2.y}`;
+
+      const { cls, marker } = edgeClassAndMarker(a, b);
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', d);
+      path.setAttribute('class', cls);
+      path.setAttribute('marker-end', marker);
+      svg.appendChild(path);
+    });
+  }
+
+  window.addEventListener('resize', drawEdges);
+  // initial layout (timeout lets fonts/layout settle)
+  setTimeout(drawEdges, 0);
+})();
+</script>
+</body>
+</html>

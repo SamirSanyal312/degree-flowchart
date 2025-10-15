@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="utf-8">
+  <title>Prerequisite Edges</title>
+</head>
+<body>
+<h1>Prerequisite Edges</h1>
+
+<table>
+  <thead>
+    <tr>
+      <th>Course</th>
+      <th>Requires</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr th:each="r : ${rows}">
+      <td th:text="${r.courseCode}">CSCI-P200</td>
+      <td th:text="${r.requiresCode}">CSCI-P100</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><a href="/courses">Back to Courses</a></p>
+</body>
+</html>

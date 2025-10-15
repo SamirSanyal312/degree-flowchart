@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <title>Degree Flow</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-
   <style>
     :root{
       --gap: 36px;
@@ -12,101 +11,57 @@
       --row-h: 120px;
       --pad: 24px;
 
-      --ok: #19b56f;
-      --ok-bg: #e7fbf2;
+      --ok: #19b56f;         --ok-bg: #e7fbf2;
+      --eligible: #3b82f6;   --eligible-bg: #eaf1ff;
+      --danger: #ef4444;     --danger-bg: #fff2f2;
 
-      --eligible: #3b82f6;
-      --eligible-bg: #eaf1ff;
-
-      --danger: #ef4444;
-      --danger-bg: #fff2f2;
-
-      --card-bg: #ffffff;
-      --ink: #181818;
-      --muted: #636c76;
-      --ring: 1.5px;
-      --radius: 14px;
-      --shadow: 0 6px 24px rgba(0,0,0,.05);
+      --card-bg: #ffffff; --ink: #181818; --muted: #636c76;
+      --ring: 1.5px; --radius: 14px; --shadow: 0 6px 24px rgba(0,0,0,.05);
     }
-
-    body{
-      margin:0;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      color: var(--ink);
-      background:#f7f7f9;
-    }
-
-    header{
-      padding: 22px var(--pad) 8px var(--pad);
-      display:flex; align-items:center; gap:24px; flex-wrap:wrap;
-    }
+    body{ margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+          color:var(--ink); background:#f7f7f9; }
+    header{ padding:22px var(--pad) 8px; display:flex; gap:24px; flex-wrap:wrap; align-items:center; }
     header h1{ font-size:28px; margin:0 24px 0 0; }
     .legend{ display:flex; gap:22px; align-items:center; }
     .lg{ display:inline-flex; align-items:center; gap:8px; color:#334155; }
     .dot{ width:10px; height:10px; border-radius:50%; display:inline-block; }
-    .dot.ok{ background:var(--ok); }
-    .dot.eligible{ background:var(--eligible); }
-    .dot.locked{ background:var(--danger); }
-    .link{ color:#2563eb; text-decoration:none; }
-    .link:hover{ text-decoration:underline; }
+    .dot.ok{ background:var(--ok); } .dot.eligible{ background:var(--eligible); } .dot.locked{ background:var(--danger); }
+    .link{ color:#2563eb; text-decoration:none; } .link:hover{ text-decoration:underline; }
 
-    /* --- board --- */
-    #board-wrap{
-      position:relative;
-      padding: 8px var(--pad) 40px var(--pad);
-    }
-    /* SVG sits behind cards but catches no mouse events */
-    #flow-canvas{
-      position:absolute; inset:0;
-      width:100%; height:100%;
-      pointer-events:none;
-      z-index:0;
-    }
+    #board-wrap{ position:relative; padding:8px var(--pad) 40px; }
+    /* SVG sits behind cards but doesn't eat mouse events */
+    #flow-canvas{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:0; }
 
     #board{
-      position:relative;
-      display:grid;
+      position:relative; z-index:1;
+      display:grid; gap:var(--gap);
       grid-template-columns: repeat(auto-fill, minmax(var(--col-w), 1fr));
       grid-auto-rows: var(--row-h);
-      gap: var(--gap);
-      z-index:1; /* above SVG */
     }
 
     .node{
-      position:relative;
-      background:var(--card-bg);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      padding: 18px 20px;
-      user-select:none;
-      cursor:grab;
-      border: var(--ring) solid transparent;
+      position:relative; background:var(--card-bg);
+      border-radius:var(--radius); box-shadow:var(--shadow);
+      padding:18px 20px; user-select:none; cursor:grab;
+      border:var(--ring) solid transparent;
     }
     .node:active{ cursor:grabbing; }
 
     .code{ font-weight:700; margin-bottom:10px; }
     .title{ color:#111827; margin-bottom:10px; }
-    .meta{ color: var(--muted); font-size: 13px; }
+    .meta{ color:var(--muted); font-size:13px; }
 
-    /* status styles */
-    .status-completed{ border-color: var(--ok); background: var(--ok-bg); }
-    .status-eligible{  border-color: var(--eligible); background: var(--eligible-bg); }
-    .status-locked{    border-color: var(--danger); background: var(--danger-bg); }
+    .status-completed{ border-color:var(--ok);      background:var(--ok-bg); }
+    .status-eligible { border-color:var(--eligible); background:var(--eligible-bg); }
+    .status-locked   { border-color:var(--danger);   background:var(--danger-bg); }
 
-    /* edges */
-    .edge{
-      fill:none;
-      stroke:#9aa4b2;
-      stroke-width:2.25;
-      opacity:.9;
-    }
-    .edge.locked  { stroke: var(--danger); }
-    .edge.ok      { stroke: var(--ok); }
-    .edge.eligible{ stroke: var(--eligible); }
+    .edge{ fill:none; stroke:#9aa4b2; stroke-width:2.5; opacity:1; }
+    .edge.ok{ stroke:var(--ok); opacity:0.85; } 
+    .edge.eligible{ stroke:var(--eligible); opacity:0.85; } 
+    .edge.locked{ stroke:var(--danger); opacity:0.85; }
   </style>
 </head>
 <body>
-
 <header>
   <h1>Degree Flow</h1>
   <div class="legend">
@@ -116,40 +71,37 @@
   </div>
   <span style="flex:1"></span>
   <a th:href="@{/courses}" class="link">Table view</a>
-  <a th:href="@{/logout}" class="link">Logout</a>
+  <a th:href="@{/logout}"  class="link">Logout</a>
 </header>
 
 <div id="board-wrap">
   <!-- SVG layer for arrows -->
   <svg id="flow-canvas" viewBox="0 0 100 100" preserveAspectRatio="none">
     <defs>
-      <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5"
-              markerWidth="8" markerHeight="8" orient="auto-start-reverse">
-        <path d="M0,0 L10,5 L0,10 z" fill="#9aa4b2"></path>
+      <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#9aa4b2"/>
       </marker>
-      <marker id="arrow-ok" viewBox="0 0 10 10" refX="10" refY="5"
-              markerWidth="8" markerHeight="8" orient="auto-start-reverse">
-        <path d="M0,0 L10,5 L0,10 z" fill="#19b56f"></path>
+      <marker id="arrow-ok" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#19b56f"/>
       </marker>
-      <marker id="arrow-eligible" viewBox="0 0 10 10" refX="10" refY="5"
-              markerWidth="8" markerHeight="8" orient="auto-start-reverse">
-        <path d="M0,0 L10,5 L0,10 z" fill="#3b82f6"></path>
+      <marker id="arrow-eligible" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#3b82f6"/>
       </marker>
-      <marker id="arrow-locked" viewBox="0 0 10 10" refX="10" refY="5"
-              markerWidth="8" markerHeight="8" orient="auto-start-reverse">
-        <path d="M0,0 L10,5 L0,10 z" fill="#ef4444"></path>
+      <marker id="arrow-locked" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#ef4444"/>
       </marker>
     </defs>
   </svg>
 
-  <!-- Cards -->
+  <!-- Course cards -->
   <div id="board">
     <div th:each="n : ${nodes}"
          class="node"
          th:classappend="' status-' + ${#strings.toLowerCase(n.status)}"
-         th:attr="data-code=${n.code}, data-status=${#strings.toLowerCase(n.status)}">
-      <div class="code"   th:text="${n.code}">CSCI-P100</div>
-      <div class="title"  th:text="${n.title}">Applied Algorithms</div>
+         th:attr="data-code=${n.code}, data-status=${#strings.toLowerCase(n.status)}"
+    >
+      <div class="code"  th:text="${n.code}">CSCI-P100</div>
+      <div class="title" th:text="${n.title}">Applied Algorithms</div>
       <div class="meta">
         <span th:text="${n.credits}">3</span> cr •
         <span th:text="${n.core} ? 'Core' : 'Elective'">Core</span>
@@ -157,10 +109,9 @@
     </div>
   </div>
 
-  <!-- Edges data (hidden) -->
-  <div id="edges" hidden>
-    <span th:each="e : ${edges}"
-          th:attr="data-from=${e.courseCode}, data-to=${e.requiresCode}"></span>
+  <!-- Hidden prereq edges: from prerequisite TO course that needs it -->
+  <div id="edges" style="display:none;">
+    <span th:each="e : ${edges}" th:attr="data-from=${e.requiresCode}, data-to=${e.courseCode}"></span>
   </div>
 </div>
 
@@ -169,17 +120,33 @@
   const svg   = document.getElementById('flow-canvas');
   const board = document.getElementById('board');
   const nodes = Array.from(board.querySelectorAll('.node'));
-  const edges = Array.from(document.querySelectorAll('#edges span'))
-                     .map(e => ({ from: e.dataset.from, to: e.dataset.to }));
+  
+  // Debug: check what we're getting
+  const edgeSpans = document.querySelectorAll('#edges span');
+  console.log('Edge spans found:', edgeSpans.length);
+  edgeSpans.forEach((span, i) => {
+    console.log(`Edge ${i}: from="${span.dataset.from}" to="${span.dataset.to}"`);
+  });
+  
+  const edges = Array.from(edgeSpans)
+                      .map(e => ({ from: e.dataset.from, to: e.dataset.to }))
+                      .filter(e => e.from && e.to); // filter out undefined
+
+  console.log('Edges found:', edges.length);
+  console.log('Nodes found:', nodes.length);
+  console.log('Node codes:', nodes.map(n => n.dataset.code));
+  
+  // keep the original <defs> markup so we can recreate it after clearing
+  const defsTemplate = document.querySelector('#flow-canvas defs').innerHTML;
 
   // index nodes by course code
   const byCode = Object.fromEntries(nodes.map(n => [n.dataset.code, n]));
 
-  // simple drag so you can rearrange quickly (keeps arrows in sync)
+  // --- drag (absolute positioning so edges can follow smoothly) ---
   nodes.forEach(n => {
-    let start = null, origin = null;
+    let start, origin;
     n.addEventListener('mousedown', e => {
-      start = { x: e.clientX, y: e.clientY };
+      start = { x:e.clientX, y:e.clientY };
       const r = n.getBoundingClientRect(), b = board.getBoundingClientRect();
       origin = { x: r.left - b.left, y: r.top - b.top };
       n.style.position = 'absolute';
@@ -187,20 +154,15 @@
       n.style.top  = origin.y + 'px';
       n.style.zIndex = 2;
       window.addEventListener('mousemove', drag);
-      window.addEventListener('mouseup', up, { once: true });
+      window.addEventListener('mouseup', up, { once:true });
       e.preventDefault();
     });
     function drag(e){
-      const dx = e.clientX - start.x, dy = e.clientY - start.y;
-      n.style.left = (origin.x + dx) + 'px';
-      n.style.top  = (origin.y + dy) + 'px';
+      n.style.left = (origin.x + (e.clientX - start.x)) + 'px';
+      n.style.top  = (origin.y + (e.clientY - start.y)) + 'px';
       drawEdges();
     }
-    function up(){
-      window.removeEventListener('mousemove', drag);
-      n.style.zIndex = 1;
-      drawEdges();
-    }
+    function up(){ window.removeEventListener('mousemove', drag); n.style.zIndex = 1; drawEdges(); }
   });
 
   function sizeCanvas(){
@@ -209,15 +171,13 @@
     svg.setAttribute('height', r.height);
     svg.setAttribute('viewBox', `0 0 ${r.width} ${r.height}`);
   }
-
   function center(el){
     const r = el.getBoundingClientRect();
     const b = board.getBoundingClientRect();
-    return { x: r.left - b.left + r.width/2, y: r.top - b.top + r.height/2 };
+    return { x: r.left - b.left + r.width / 2, y: r.top - b.top + r.height / 2 };
   }
-
-  function edgeClassAndMarker(fromEl, toEl){
-    // choose color based on the *target* status; tweak if you prefer source
+  function edgeStyle(fromEl, toEl){
+    // color by target status (course that depends on prereq)
     const st = (toEl?.dataset.status || 'locked');
     if (st === 'completed') return { cls:'edge ok',       marker:'url(#arrow-ok)' };
     if (st === 'eligible')  return { cls:'edge eligible', marker:'url(#arrow-eligible)' };
@@ -226,37 +186,37 @@
 
   function drawEdges(){
     sizeCanvas();
-    // clear current
+    // wipe but then restore <defs> so markers remain available
     while (svg.lastChild) svg.removeChild(svg.lastChild);
-    // re-add defs (so markers remain after clearing)
     const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-    defs.innerHTML = document.querySelector('#flow-canvas defs').innerHTML;
+    defs.innerHTML = defsTemplate;
     svg.appendChild(defs);
 
     edges.forEach(e => {
-      const a = byCode[e.to];     // prerequisite node (from)
-      const b = byCode[e.from];   // course that requires it (to)
-      if (!a || !b) return;
+      const prereq = byCode[e.from];  // the prerequisite course
+      const course = byCode[e.to];    // the course that needs the prereq
+      if (!prereq || !course) {
+        console.log('Missing node for edge:', e, 'prereq exists:', !!prereq, 'course exists:', !!course);
+        return;
+      }
 
-      const p1 = center(a);
-      const p2 = center(b);
+      const a = center(prereq), b = center(course);
+      const midY = (a.y + b.y) / 2;
+      const d = `M ${a.x} ${a.y} C ${a.x} ${midY}, ${b.x} ${midY}, ${b.x} ${b.y}`;
 
-      // nice S curve between centers
-      const midY = (p1.y + p2.y) / 2;
-      const d = `M ${p1.x} ${p1.y} C ${p1.x} ${midY}, ${p2.x} ${midY}, ${p2.x} ${p2.y}`;
-
-      const { cls, marker } = edgeClassAndMarker(a, b);
+      const { cls, marker } = edgeStyle(prereq, course);
       const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
       path.setAttribute('d', d);
       path.setAttribute('class', cls);
       path.setAttribute('marker-end', marker);
       svg.appendChild(path);
     });
+    
+    console.log('Drew', svg.querySelectorAll('path.edge').length, 'edges');
   }
 
   window.addEventListener('resize', drawEdges);
-  // initial layout (timeout lets fonts/layout settle)
-  setTimeout(drawEdges, 0);
+  setTimeout(drawEdges, 100); // let layout settle first
 })();
 </script>
 </body>

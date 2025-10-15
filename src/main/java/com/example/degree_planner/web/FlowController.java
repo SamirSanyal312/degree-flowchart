@@ -4,7 +4,7 @@ import com.example.degree_planner.data.CourseRepository;
 import com.example.degree_planner.data.PrereqRepository;
 import com.example.degree_planner.domain.Course;
 import com.example.degree_planner.domain.Status;
-import com.example.degree_planner.domain.PrereqEdge;
+import com.example.degree_planner.domain.Prereq;
 import com.example.degree_planner.service.EligibilityService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
@@ -71,7 +71,9 @@ public class FlowController {
         }
 
         // 5) Load edges (course_code, requires_code)
-        List<PrereqEdge> edges = prereqs.findAllEdges();
+        // Changed from PrereqEdge to Prereq
+        List<Prereq> edges = StreamSupport.stream(prereqs.findAll().spliterator(), false)
+                .toList();
 
         model.addAttribute("nodes", nodes);
         model.addAttribute("edges", edges);

@@ -2,6 +2,8 @@
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
   <meta charset="UTF-8" />
+  <meta name="_csrf" th:content="${_csrf.token}">
+  <meta name="_csrf_header" th:content="${_csrf.headerName}">
   <title>Degree Flow</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="preconnect" href="https://fonts.gstatic.com">
@@ -9,22 +11,29 @@
 
   <style>
     :root{
-      --ok:#2e7d32; --ok-bg:#e8f5e9; --ok-b:#10b981;
-      --el:#1565c0; --el-bg:#e3f2fd; --el-b:#3b82f6;
-      --lo:#9e9e9e; --lo-bg:#f4f4f5; --lo-b:#d0d0d0;
+      --ok:#2e7d32; --ok-bg:#e8f5e9;
+      --el:#1565c0; --el-bg:#e3f2fd;
+      --lo:#9e9e9e; --lo-bg:#f4f4f5;
       --ink:#181818; --muted:#636c76;
     }
     body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,
          "Apple Color Emoji","Segoe UI Emoji";background:#f7f7f8;color:var(--ink)}
     .wrap{max-width:1200px;margin:0 auto;padding:24px 20px}
     header{display:flex;align-items:baseline;justify-content:space-between}
-    h1{margin:0 0 6px;font-size:28px}
+    h1{margin:0 0 4px;font-size:28px}
+    .subtitle{color:#475467;font-size:14px;margin:0 0 8px}
     .legend{display:flex;gap:18px;margin:4px 0 16px;font-size:14px}
     .legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px}
     .legend .ok i{background:var(--ok)}
     .legend .el i{background:var(--el)}
     .legend .lo i{background:var(--lo)}
     .top-actions{display:flex;gap:12px}
+    #summary{display:flex;gap:12px;align-items:center;margin:8px 0 14px;flex-wrap:wrap}
+    #progress-pill{font-size:14px;background:#fff;border:1px solid #eee;border-radius:999px;padding:6px 10px}
+    #sem-chips{display:flex;gap:8px;flex-wrap:wrap}
+    .chip{font-size:12px;background:#fff;border:1px solid #eee;border-radius:999px;padding:4px 8px}
+    .chip button{margin-left:8px;padding:2px 8px;border:1px solid #ddd;border-radius:999px;background:#fff;cursor:pointer}
+    .chip button[disabled]{opacity:.6;cursor:not-allowed}
     #board{position:relative;min-height:520px;background:#fafafa;border:1px solid #eee;border-radius:12px}
     #flow-canvas{position:absolute;inset:0;overflow:visible}
     .node{position:absolute;width:260px;padding:14px 16px;border-radius:12px;border:2px solid transparent;
@@ -36,12 +45,22 @@
     .eligible{background:var(--el-bg);border-color:var(--el)}
     .locked{background:var(--lo-bg);border-color:var(--lo)}
     .edge{stroke:#b6b6b6;stroke-width:1.5;fill:none}
-    .edge.ok{stroke:var(--ok)}
-    .edge.eligible{stroke:var(--el)}
-    .edge.locked{stroke:#e57373}
-    g[tabindex]:focus rect{outline:none;stroke-width:3}
+    .edge.ok{stroke:var(--ok)} .edge.eligible{stroke:var(--el)} .edge.locked{stroke:#e57373}
     .hint{color:var(--muted);font-size:12px;margin-top:8px}
     button{padding:8px 12px;border:1px solid #ddd;border-radius:8px;background:white;cursor:pointer}
+
+    /* planner dialog */
+    .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.25);display:none;align-items:center;justify-content:center;z-index:10}
+    .modal{background:#fff;border-radius:12px;border:1px solid #eee;max-width:720px;width:92%;padding:16px 18px;box-shadow:0 10px 30px rgba(0,0,0,.15)}
+    .modal header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+    .modal h2{margin:0;font-size:18px}
+    .modal .list{max-height:320px;overflow:auto;border:1px solid #eee;border-radius:8px;padding:8px}
+    .course-row{display:flex;justify-content:space-between;align-items:center;padding:6px 4px;border-bottom:1px dashed #eee;font-size:14px}
+    .course-row:last-child{border-bottom:0}
+    .pill{display:inline-block;border:1px solid #eee;border-radius:999px;padding:2px 8px;font-size:12px;background:#f9f9fb}
+    .actions{display:flex;gap:10px;justify-content:flex-end;margin-top:12px}
+    .danger{color:#b00020}
+    .muted{color:#6b7280}
   </style>
 </head>
 <body>
@@ -49,6 +68,7 @@
   <header>
     <div>
       <h1>Degree Flow</h1>
+      <div class="subtitle" th:text="${degreeName}">M.S. in Computer Science</div>
       <div class="legend" aria-hidden="true">
         <span class="ok"><i></i>Completed</span>
         <span class="el"><i></i>Eligible</span>
@@ -62,21 +82,43 @@
     </div>
   </header>
 
+  <!-- Summary bar -->
+  <div id="summary">
+    <div id="progress-pill"></div>
+    <div id="sem-chips"></div>
+    <button id="resetLayout" type="button" aria-label="Reset layout">Reset layout</button>
+  </div>
+
   <div id="board">
-    <svg id="flow-canvas" width="1200" height="600" role="img"
-         aria-label="Degree requirements flow chart"></svg>
+    <svg id="flow-canvas" width="1200" height="600" role="img" aria-label="Degree requirements flow chart"></svg>
   </div>
   <p class="hint">Tip: drag cards, wheel to zoom (Ctrl/Cmd + +/- also works). Edges update live.</p>
 </div>
 
-<!-- Export data as JSON (safe for Thymeleaf) -->
+<!-- Planner modal -->
+<div id="plannerBackdrop" class="modal-backdrop" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="plannerTitle">
+    <header>
+      <h2 id="plannerTitle">Plan Semester</h2>
+      <button id="closePlanner" type="button">Close</button>
+    </header>
+    <div class="muted" id="plannerHint">Choose 3–9 credits. Only valid courses for this term are shown.</div>
+    <div class="list" id="courseList"></div>
+    <div class="actions">
+      <div class="pill" id="creditCount">0 credits</div>
+      <button id="savePlan" disabled>Save plan</button>
+    </div>
+    <div id="plannerError" class="danger" style="margin-top:6px;display:none"></div>
+  </div>
+</div>
+
+<!-- Export data as JSON (Thymeleaf) -->
 <script th:inline="javascript">
 /*<![CDATA[*/
-  // Each node from server should have: code, title, credits, core (bool), status ("COMPLETED"|"ELIGIBLE"|"LOCKED"), col (int), row (int)
-  // Optional node.unmet: list of missing prereq codes (can be empty)
   const SERVER_NODES = /*[[${nodes}]]*/ [];
-  // Each edge from server: requiresCode, courseCode, met (bool)
   const SERVER_EDGES = /*[[${edges}]]*/ [];
+  const SERVER_SEMS  = /*[[${semesters}]]*/ [];
+  const SERVER_PROGRESS = /*[[${progress}]]*/ null;
 /*]]>*/
 </script>
 
@@ -85,177 +127,173 @@
   const board = document.getElementById('board');
   const svg   = document.getElementById('flow-canvas');
 
-  // ----- normalize server data -> local DTOs --------------------------------
+  // ====== normalize server data ======
   const nodes = SERVER_NODES.map(n => ({
-    code: n.code,
-    title: n.title,
-    credits: n.credits ?? 0,
-    core: !!n.core,
-    status: (n.status || 'LOCKED').toUpperCase(),
-    col: Number(n.col ?? 1),
-    row: Number(n.row ?? 0),
+    code: n.code, title: n.title, credits: n.credits ?? 0,
+    core: !!n.core, status: (n.status||'LOCKED').toUpperCase(),
+    col: Number(n.col ?? 1), row: Number(n.row ?? 0),
     unmet: Array.isArray(n.unmet) ? n.unmet : []
   }));
+  const edges = SERVER_EDGES.map(e => ({ from:e.requiresCode, to:e.courseCode, met:!!e.met }))
+                           .filter(e => e.from && e.to);
 
-  const edges = SERVER_EDGES.map(e => ({
-    from: e.requiresCode,
-    to:   e.courseCode,
-    met:  !!e.met
-  })).filter(e => e.from && e.to);
-
-  // ----- create DOM cards for nodes -----------------------------------------
+  // ====== cards ======
   const cardByCode = new Map();
-
-  function statusClass(s){
-    if (s === 'COMPLETED') return 'completed';
-    if (s === 'ELIGIBLE')  return 'eligible';
-    return 'locked';
-  }
-
+  function statusClass(s){ return s==='COMPLETED'?'completed':(s==='ELIGIBLE'?'eligible':'locked'); }
   function createCard(n){
-    const div = document.createElement('div');
-    div.className = `node ${statusClass(n.status)}`;
-    div.dataset.code = n.code;
-    div.dataset.status = statusClass(n.status);
-    div.style.left = (40 + (n.col-1)*300) + 'px';
-    div.style.top  = (40 + n.row*140) + 'px';
-
-    const h3 = document.createElement('h3');
-    h3.textContent = n.code;
-    const p = document.createElement('p');
-    p.textContent = n.title;
-    const meta = document.createElement('div');
-    meta.className = 'meta';
-    meta.textContent = `${n.credits} cr • ${n.core ? 'Core' : 'Elective'}`;
-
-    if (n.unmet && n.unmet.length){
-      div.title = `Missing: ${n.unmet.join(', ')}`;
-    }
-
-    div.append(h3, p, meta);
-    board.appendChild(div);
-    cardByCode.set(n.code, div);
-    makeDraggable(div);
-    return div;
+    const d = document.createElement('div');
+    d.className = `node ${statusClass(n.status)}`;
+    d.dataset.code=n.code; d.dataset.status=statusClass(n.status);
+    d.style.left = (40 + (n.col-1)*300) + 'px'; d.style.top = (40 + n.row*140) + 'px';
+    const h3 = d.appendChild(document.createElement('h3')); h3.textContent=n.code;
+    const p = d.appendChild(document.createElement('p'));  p.textContent=n.title;
+    const m = d.appendChild(document.createElement('div')); m.className='meta'; m.textContent=`${n.credits} cr • ${n.core?'Core':'Elective'}`;
+    if (n.unmet?.length) d.title = `Missing: ${n.unmet.join(', ')}`;
+    board.appendChild(d); cardByCode.set(n.code, d); makeDraggable(d); return d;
   }
-
   nodes.forEach(createCard);
 
-  // ----- SVG edges layer (persistent <defs>) ---------------------------------
-  const NS = 'http://www.w3.org/2000/svg';
-  const defs = document.createElementNS(NS, 'defs');
+  // ====== edges ======
+  const NS='http://www.w3.org/2000/svg';
+  const defs=document.createElementNS(NS,'defs');
   defs.innerHTML = `
     <marker id="arrow-ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2e7d32"></path>
-    </marker>
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2e7d32"></path></marker>
     <marker id="arrow-eligible" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M 0 0 L 10 5 L 0 10 z" fill="#1565c0"></path>
-    </marker>
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#1565c0"></path></marker>
     <marker id="arrow-locked" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M 0 0 L 10 5 L 0 10 z" fill="#e57373"></path>
-    </marker>`;
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#e57373"></path></marker>`;
   svg.appendChild(defs);
-
-  const edgesG = document.createElementNS(NS,'g');
-  edgesG.setAttribute('id','edges-layer');
-  svg.appendChild(edgesG);
+  const edgesG=document.createElementNS(NS,'g'); edgesG.setAttribute('id','edges-layer'); svg.appendChild(edgesG);
 
   function boardRect(){ return board.getBoundingClientRect(); }
-  function cardRect(el){
-    const r = el.getBoundingClientRect(), b = boardRect();
-    return { x:r.left-b.left, y:r.top-b.top, w:r.width, h:r.height };
-  }
-  function anchorRight(el){ const r = cardRect(el); return { x:r.x + r.w, y:r.y + r.h/2 }; }
-  function anchorLeft (el){ const r = cardRect(el); return { x:r.x,       y:r.y + r.h/2 }; }
+  function cardRect(el){ const r=el.getBoundingClientRect(), b=boardRect(); return {x:r.left-b.left,y:r.top-b.top,w:r.width,h:r.height}; }
+  function anchorRight(el){ const r=cardRect(el); return {x:r.x+r.w, y:r.y+r.h/2}; }
+  function anchorLeft (el){ const r=cardRect(el); return {x:r.x,    y:r.y+r.h/2}; }
+  function edgeStyle(t){ const st=t?.dataset.status||'locked'; return st==='completed'?{cls:'edge ok','marker':'url(#arrow-ok)'}:st==='eligible'?{cls:'edge eligible','marker':'url(#arrow-eligible)'}:{cls:'edge locked','marker':'url(#arrow-locked)'}; }
 
-  function edgeStyle(targetEl){
-    const st = targetEl?.dataset.status || 'locked';
-    if (st === 'completed') return { cls:'edge ok', marker:'url(#arrow-ok)' };
-    if (st === 'eligible')  return { cls:'edge eligible', marker:'url(#arrow-eligible)' };
-    return { cls:'edge locked', marker:'url(#arrow-locked)' };
-  }
-
-  // rAF-throttled redraw
-  let needsDraw = false;
-  function scheduleDraw(){
-    if (needsDraw) return;
-    needsDraw = true;
-    requestAnimationFrame(() => { needsDraw = false; drawEdges(); });
-  }
-
-  function resizeCanvas(){
-    const r = boardRect();
-    svg.setAttribute('width', r.width);
-    svg.setAttribute('height', r.height);
-    svg.setAttribute('viewBox', `0 0 ${r.width} ${r.height}`);
-  }
-
+  let needsDraw=false;
+  function scheduleDraw(){ if(needsDraw) return; needsDraw=true; requestAnimationFrame(()=>{needsDraw=false; drawEdges();}); }
+  function resizeCanvas(){ const r=boardRect(); svg.setAttribute('width',r.width); svg.setAttribute('height',r.height); svg.setAttribute('viewBox',`0 0 ${r.width} ${r.height}`); }
   function drawEdges(){
-    resizeCanvas();
-    while (edgesG.firstChild) edgesG.removeChild(edgesG.firstChild);
-
+    resizeCanvas(); while(edgesG.firstChild) edgesG.removeChild(edgesG.firstChild);
     for (const e of edges){
-      const fromEl = cardByCode.get(e.from);
-      const toEl   = cardByCode.get(e.to);
-      if (!fromEl || !toEl) continue;
-
-      const a = anchorRight(fromEl);
-      const b = anchorLeft(toEl);
-      const midX = (a.x + b.x) / 2;
-      const d = `M ${a.x} ${a.y} C ${midX} ${a.y}, ${midX} ${b.y}, ${b.x} ${b.y}`;
-
-      const st = edgeStyle(toEl);
-      const path = document.createElementNS(NS,'path');
-      path.setAttribute('d', d);
-      path.setAttribute('class', st.cls + (e.met ? '' : ' locked'));
-      path.setAttribute('marker-end', st.marker);
+      const aEl=cardByCode.get(e.from), bEl=cardByCode.get(e.to); if(!aEl||!bEl) continue;
+      const a=anchorRight(aEl), b=anchorLeft(bEl); const dx=Math.max(40,Math.abs(b.x-a.x)*.5);
+      const d=`M ${a.x} ${a.y} C ${a.x+dx} ${a.y}, ${b.x-dx} ${b.y}, ${b.x} ${b.y}`;
+      const st=edgeStyle(bEl); const path=document.createElementNS(NS,'path');
+      path.setAttribute('d',d); path.setAttribute('class',st.cls + (e.met?'':' locked')); path.setAttribute('marker-end',st.marker);
       edgesG.appendChild(path);
     }
   }
 
-  // ----- dragging -------------------------------------------------------------
   function makeDraggable(el){
     let start, origin;
-    function onMove(e){
-      el.style.left = (origin.x + (e.clientX - start.x)) + 'px';
-      el.style.top  = (origin.y + (e.clientY - start.y)) + 'px';
-      scheduleDraw();
-    }
-    function onUp(){
-      // snap-to-grid (optional)
-      const g = 20;
-      const x = Math.round(parseInt(el.style.left || '0',10)/g)*g;
-      const y = Math.round(parseInt(el.style.top  || '0',10)/g)*g;
-      el.style.left = x + 'px'; el.style.top = y + 'px';
-      window.removeEventListener('mousemove', onMove);
-      scheduleDraw();
-    }
-    el.addEventListener('mousedown', e => {
-      const r = el.getBoundingClientRect(), b = boardRect();
-      start  = { x:e.clientX, y:e.clientY };
-      origin = { x:r.left - b.left, y:r.top - b.top };
-      el.style.position = 'absolute';
-      el.style.left = origin.x + 'px';
-      el.style.top  = origin.y + 'px';
-      el.style.zIndex = 2;
-      window.addEventListener('mousemove', onMove);
-      window.addEventListener('mouseup', onUp, { once:true });
-      e.preventDefault();
-    });
+    function onMove(e){ el.style.left=(origin.x+(e.clientX-start.x))+'px'; el.style.top=(origin.y+(e.clientY-start.y))+'px'; scheduleDraw(); }
+    function onUp(){ const g=20; el.style.left=(Math.round(parseInt(el.style.left||'0',10)/g)*g)+'px'; el.style.top=(Math.round(parseInt(el.style.top||'0',10)/g)*g)+'px'; window.removeEventListener('mousemove',onMove); scheduleDraw(); }
+    el.addEventListener('mousedown',e=>{ const r=el.getBoundingClientRect(), b=boardRect(); start={x:e.clientX,y:e.clientY}; origin={x:r.left-b.left,y:r.top-b.top};
+      el.style.position='absolute'; el.style.left=origin.x+'px'; el.style.top=origin.y+'px'; el.style.zIndex=2; window.addEventListener('mousemove',onMove); window.addEventListener('mouseup',onUp,{once:true}); e.preventDefault(); });
   }
 
-  // ----- fit to content -------------------------------------------------------
-  function fit(){
-    // simple center: ensure all cards are in viewBox (padding applied)
-    resizeCanvas(); scheduleDraw();
-  }
-  document.getElementById('fit').addEventListener('click', fit);
+  // ====== summary UI (progress + sem chips) ======
+  (function(){
+    const pill=document.getElementById('progress-pill'); const chips=document.getElementById('sem-chips');
+    if (SERVER_PROGRESS && pill){
+      const {earned,planned,totalRequired}=SERVER_PROGRESS; const remaining=Math.max(0,totalRequired-(earned+planned));
+      pill.textContent=`Progress: ${earned} cr earned, ${planned} cr planned → ${remaining} cr remaining (of ${totalRequired})`;
+    }
+    if (Array.isArray(SERVER_SEMS) && chips){
+      chips.innerHTML='';
+      SERVER_SEMS.forEach(s=>{
+        const season=(s.num % 2 === 1) ? 'Fall' : 'Spring';
+        const span=document.createElement('span'); span.className='chip'; span.textContent=`Sem ${s.num} • ${season} • ${s.availableCount} available`;
+        if (s.readOnly){
+          span.textContent += ' (read-only)';
+        } else {
+          const btn=document.createElement('button'); btn.textContent='Plan Sem '+s.num;
+          btn.addEventListener('click',()=>openPlanner(s.num)); span.appendChild(btn);
+        }
+        chips.appendChild(span);
+      });
+    }
+  })();
 
+  // ====== Reset layout ======
+  document.getElementById('resetLayout').addEventListener('click',()=>{ try{localStorage.removeItem('degree-flow:layout:v1');}catch{} location.reload(); });
+
+  // ====== Fit ======
+  document.getElementById('fit').addEventListener('click',()=>{ resizeCanvas(); scheduleDraw(); });
   window.addEventListener('resize', scheduleDraw);
   new ResizeObserver(scheduleDraw).observe(board);
-
-  // initial draw
   setTimeout(scheduleDraw, 80);
+
+  // ====== Planner Dialog ======
+  const backdrop = document.getElementById('plannerBackdrop');
+  const courseList = document.getElementById('courseList');
+  const creditCount = document.getElementById('creditCount');
+  const plannerError = document.getElementById('plannerError');
+  const plannerTitle = document.getElementById('plannerTitle');
+  const saveBtn = document.getElementById('savePlan');
+  document.getElementById('closePlanner').addEventListener('click', closePlanner);
+
+  function openPlanner(sem){
+    plannerTitle.textContent = `Plan Semester ${sem}`;
+    plannerError.style.display='none'; plannerError.textContent='';
+    courseList.innerHTML = '<div class="muted">Loading…</div>'; saveBtn.disabled=true;
+    backdrop.style.display='flex'; backdrop.setAttribute('aria-hidden','false');
+    // fetch available
+    fetch(`/api/semesters/${sem}/available`).then(r=>r.json()).then(items=>{
+      renderCourseList(items, sem);
+    }).catch(err=>{
+      courseList.innerHTML = '<div class="danger">Failed to load courses.</div>';
+    });
+  }
+  function closePlanner(){
+    backdrop.style.display='none'; backdrop.setAttribute('aria-hidden','true');
+  }
+
+  function renderCourseList(items, sem){
+    courseList.innerHTML='';
+    let total=0;
+    const selected = new Set();
+    const creditBy = new Map(items.map(it=>[it.code, it.credits||0]));
+    function refresh(){
+      total = [...selected].reduce((s,c)=>s+(creditBy.get(c)||0),0);
+      creditCount.textContent = `${total} credits`;
+      saveBtn.disabled = !(total>=3 && total<=9);
+    }
+    items.forEach(it=>{
+      const row=document.createElement('div'); row.className='course-row';
+      const left=document.createElement('div'); left.innerHTML = `<strong>${it.code}</strong> — ${it.title}`;
+      const right=document.createElement('div'); right.innerHTML = `<span class="pill">${it.credits} cr • ${it.core?'Core':'Elective'}</span>`;
+      const cb=document.createElement('input'); cb.type='checkbox'; cb.style.marginRight='8px';
+      cb.addEventListener('change',()=>{ if(cb.checked) selected.add(it.code); else selected.delete(it.code); refresh(); });
+      left.prepend(cb); row.append(left,right); courseList.appendChild(row);
+    });
+    refresh();
+
+    const token = document.querySelector('meta[name="_csrf"]').content;
+    const header = document.querySelector('meta[name="_csrf_header"]').content;
+
+    saveBtn.onclick = () => {
+      plannerError.style.display='none'; plannerError.textContent='';
+      fetch('/api/plan', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json',[header]:token },
+        body: JSON.stringify({ semesterNo: sem, courseCodes: [...selected] })
+      }).then(async r=>{
+        const data = await r.json().catch(()=>({}));
+        if (!r.ok || data.status==='error'){
+          throw new Error(data.message || 'Save failed');
+        }
+        closePlanner();
+        location.reload(); // refresh counts & progress
+      }).catch(err=>{
+        plannerError.textContent = err.message || 'Save failed';
+        plannerError.style.display='block';
+      });
+    };
+  }
 })();
 </script>
 </body>

@@ -67,7 +67,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build & Push (only on main)
-        if: github.ref == 'refs/heads/main'
+        if: ${{ github.ref == 'refs/heads/main' }}
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -77,5 +77,13 @@ jobs:
             ghcr.io/${{ env.OWNER_LC }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
 
       - name: Trigger Render deploy (after push)
-        if: github.ref == 'refs/heads/main' && secrets.RENDER_DEPLOY_HOOK != ''
-        run: curl -fsSL "${{ secrets.RENDER_DEPLOY_HOOK }}"
+        if: ${{ github.ref == 'refs/heads/main' }}
+        env:
+          RENDER_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          if [ -n "$RENDER_HOOK" ]; then
+            echo "Triggering Render deploy..."
+            curl -fsSL "$RENDER_HOOK" || { echo "Render hook call failed"; exit 1; }
+          else
+            echo "RENDER_DEPLOY_HOOK not set; skipping deploy hook."
+          fi

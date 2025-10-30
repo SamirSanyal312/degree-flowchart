@@ -6,9 +6,13 @@ on:
   pull_request:
     branches: [ main ]
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
-  packages: write    # <-- required to push to GHCR
+  packages: write        # required to push to GHCR
   id-token: write
 
 env:
@@ -27,15 +31,15 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-          cache: 'maven'
+          cache: maven
 
       - name: Ensure mvnw is runnable on Linux
         run: |
-        # strip any Windows CRLF just in case
+          # strip any Windows CRLF just in case
           sed -i 's/\r$//' mvnw
-        # set executable bit for this runner
+          # set executable bit for this runner
           chmod +x mvnw
-        # show what it is now
+          # show what it is now
           ls -l mvnw
 
       - name: Run unit tests
@@ -73,6 +77,5 @@ jobs:
             ghcr.io/${{ env.OWNER_LC }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
 
       - name: Trigger Render deploy (after push)
-        if: github.ref == 'refs/heads/main'
-        run: |
-          curl -fsSL "${{ secrets.RENDER_DEPLOY_HOOK }}"
+        if: github.ref == 'refs/heads/main' && secrets.RENDER_DEPLOY_HOOK != ''
+        run: curl -fsSL "${{ secrets.RENDER_DEPLOY_HOOK }}"

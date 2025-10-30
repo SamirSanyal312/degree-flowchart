@@ -62,3 +62,8 @@ jobs:
           tags: |
             ghcr.io/${{ env.OWNER_LC }}/${{ env.IMAGE_NAME }}:latest
             ghcr.io/${{ env.OWNER_LC }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+      - name: Trigger Render deploy (after push)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          curl -fsSL "${{ secrets.RENDER_DEPLOY_HOOK }}"

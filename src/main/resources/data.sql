@@ -138,20 +138,22 @@ INSERT OR IGNORE INTO degree_group_course(group_code, course_code) VALUES
    ------------------------------------------- */
 -- student2 has finished 12 credits across 2 semesters
 -- Foundations + Systems + 2 core examples
-INSERT OR IGNORE INTO completion(student_id, course_code) VALUES
- (2,'CSCI-B503'),  -- Foundations (3)
- (2,'CSCI-P536'),  -- Systems     (3)
- (2,'CSCI-P200'),  -- Core        (3)
- (2,'CSCI-B561');  -- Core        (3)
+DELETE FROM students WHERE id IN (1,2);
+
+INSERT INTO students(id, username, display_name, start_semester, degree) VALUES
+  (1,'student1','Alice Student (MS CS)',1,'MS'),
+  (2,'student2','Bob Student (MS CS)',3,'MS');
+  
+DELETE FROM completion WHERE student_id = 2;
+
+-- Add semester_no to the INSERT statement
+INSERT INTO completion(student_id, course_code, semester_no) VALUES
+ (2,'CSCI-B503', 3),  -- Foundations (3) - completed in semester 3
+ (2,'CSCI-P536', 3),  -- Systems     (3) - completed in semester 3
+ (2,'CSCI-P200', 4),  -- Core        (3) - completed in semester 4
+ (2,'CSCI-B561', 4);  -- Core        (3) - completed in semester 4
 
 
-INSERT OR IGNORE INTO completion(student_id, course_code)
-SELECT s.id, 'CSCI-B503' FROM students s WHERE s.username = 'student2';
-INSERT OR IGNORE INTO completion(student_id, course_code)
-SELECT s.id, 'CSCI-P536' FROM students s WHERE s.username = 'student2';
-INSERT OR IGNORE INTO completion(student_id, course_code)
-SELECT s.id, 'CSCI-P200' FROM students s WHERE s.username = 'student2';
-INSERT OR IGNORE INTO completion(student_id, course_code)
-SELECT s.id, 'CSCI-B561' FROM students s WHERE s.username = 'student2';
+
 -- No pre-planned future semesters by default
 -- (semester_plan remains empty; student will plan Sem 3+4 in the UI)

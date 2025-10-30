@@ -146,12 +146,12 @@ INSERT OR IGNORE INTO completion(student_id, course_code) VALUES
 
 
 INSERT OR IGNORE INTO completion(student_id, course_code)
-SELECT s.id, 'CSCI-B503' FROM student s WHERE s.username = 'student2';
+SELECT s.id, 'CSCI-B503' FROM students s WHERE s.username = 'student2';
 INSERT OR IGNORE INTO completion(student_id, course_code)
-SELECT s.id, 'CSCI-P536' FROM student s WHERE s.username = 'student2';
+SELECT s.id, 'CSCI-P536' FROM students s WHERE s.username = 'student2';
 INSERT OR IGNORE INTO completion(student_id, course_code)
-SELECT s.id, 'CSCI-P200' FROM student s WHERE s.username = 'student2';
+SELECT s.id, 'CSCI-P200' FROM students s WHERE s.username = 'student2';
 INSERT OR IGNORE INTO completion(student_id, course_code)
-SELECT s.id, 'CSCI-B561' FROM student s WHERE s.username = 'student2';
+SELECT s.id, 'CSCI-B561' FROM students s WHERE s.username = 'student2';
 -- No pre-planned future semesters by default
 -- (semester_plan remains empty; student will plan Sem 3+4 in the UI)

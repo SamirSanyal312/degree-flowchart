@@ -25,7 +25,6 @@ public class FlowController {
   private final PrereqRepository prereqs;
   private final JdbcTemplate jdbc;
 
-  // DTOs
   public record NodeDTO(
       String code, String title, int credits, boolean core,
       String status, int col, int row, List<String> unmet
@@ -33,6 +32,8 @@ public class FlowController {
   public record EdgeDTO(String requiresCode, String courseCode, boolean met) {}
   public record SemesterDTO(int num, boolean readOnly, int availableCount, int plannedCredits) {}
   public record ProgressDTO(int earned, int planned, int totalRequired) {}
+  public record GroupDTO(String code, String name, int needCredits, Integer capCredits,
+                         Integer chooseN, int earned, int planned) {}
 
   @GetMapping("/flow")
   @Transactional(readOnly = true)
@@ -81,7 +82,14 @@ public class FlowController {
         studentId
     );
 
-    // 4) Offerings (explicit RowCallbackHandler to avoid ambiguity)
+    // --- NEW: flatten plans for UI "Planned" (red) styling ---
+    Set<String> plannedCodes = plans.values().stream()
+        .flatMap(Set::stream)
+        .collect(Collectors.toCollection(LinkedHashSet::new));
+    model.addAttribute("plannedCodes", plannedCodes);
+    // --- END NEW ---
+
+    // 4) Offerings
     Map<String, Integer> fallMap = new HashMap<>();
     Map<String, Integer> springMap = new HashMap<>();
     jdbc.query(
@@ -101,7 +109,7 @@ public class FlowController {
           ? "ELIGIBLE" : "LOCKED");
     }
 
-    // 6) Layout: columns via prereq depth, rows stable
+    // 6) Layout
     Map<String, Integer> memoLevel = new HashMap<>();
     for (Course c : allCourses) dfsLevel(c.getCode(), prereqMap, memoLevel);
 
@@ -141,7 +149,7 @@ public class FlowController {
           completed.contains(e.getRequiresCode())));
     }
 
-    // 8) Semesters & progress
+    // 8) Semesters & overall progress
     Map<String, Integer> credits = allCourses.stream()
         .collect(Collectors.toMap(Course::getCode, c -> c.getCredits() == null ? 0 : c.getCredits()));
 
@@ -182,13 +190,62 @@ public class FlowController {
 
     ProgressDTO progress = new ProgressDTO(earnedCredits, plannedCreditsTotal, TOTAL_REQ_CREDITS);
 
-    // 9) Model → view
+    // 9) Degree buckets (groups) and progress
+    //    - read the groups
+    List<GroupDTO> groups = new ArrayList<>();
+    Map<String, GroupDTO> byGroup = new LinkedHashMap<>();
+    jdbc.query("select code, name, min_credits, max_credits, choose_n from degree_group order by rowid",
+        (RowCallbackHandler) rs -> {
+          String code = rs.getString("code");
+          GroupDTO g = new GroupDTO(
+              code,
+              rs.getString("name"),
+              rs.getInt("min_credits"),
+              (Integer) rs.getObject("max_credits"),
+              (Integer) rs.getObject("choose_n"),
+              0, 0
+          );
+          byGroup.put(code, g);
+        });
+
+    //    - mapping: which course belongs to which groups
+    Map<String, Set<String>> groupCourses = new HashMap<>();
+    jdbc.query("select group_code, course_code from degree_group_course",
+        (RowCallbackHandler) rs -> {
+          groupCourses
+              .computeIfAbsent(rs.getString("group_code"), k -> new LinkedHashSet<>())
+              .add(rs.getString("course_code"));
+        });
+
+    //    - accumulate earned & planned credits per group
+    Map<String, int[]> tmp = new LinkedHashMap<>(); // code -> [earned, planned]
+    for (String g : byGroup.keySet()) tmp.put(g, new int[]{0,0});
+
+    for (var e : tmp.entrySet()) {
+      String g = e.getKey();
+      Set<String> members = groupCourses.getOrDefault(g, Set.of());
+      int earned = completed.stream().filter(members::contains)
+          .mapToInt(c -> credits.getOrDefault(c, 0)).sum();
+      // planned across any semester
+      int planned = plans.values().stream().flatMap(Set::stream)
+          .filter(members::contains).mapToInt(c -> credits.getOrDefault(c, 0)).sum();
+      e.getValue()[0]=earned; e.getValue()[1]=planned;
+    }
+    // finalize GroupDTO list keeping order
+    for (var g : byGroup.values()) {
+      int[] v = tmp.get(g.code());
+      groups.add(new GroupDTO(g.code(), g.name(), g.needCredits(), g.capCredits(), g.chooseN(), v[0], v[1]));
+    }
+
+    // 10) Model → view
     model.addAttribute("displayName", student.get("display_name"));
     model.addAttribute("degreeName", degreeName);
     model.addAttribute("nodes", nodes);
     model.addAttribute("edges", edges);
     model.addAttribute("semesters", sems);
     model.addAttribute("progress", progress);
+    model.addAttribute("groups", groups);
+    model.addAttribute("plannedCodes", plannedCodes); // NEW: for red "Planned" styling
     return "flow";
   }
 

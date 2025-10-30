@@ -86,3 +86,19 @@ CREATE TABLE IF NOT EXISTS req_group_courses (
 
 CREATE INDEX IF NOT EXISTS idx_req_group_courses_gid ON req_group_courses(group_id);
 CREATE INDEX IF NOT EXISTS idx_req_group_courses_code ON req_group_courses(course_code);
+
+-- Degree requirement buckets (program-agnostic)
+create table if not exists degree_group (
+  code           text primary key,           -- e.g., FOUNDATIONS, SYSTEMS, CORE, CREATIVITY
+  name           text not null,              -- display name
+  min_credits    integer not null default 0, -- required credits
+  max_credits    integer,                    -- optional cap
+  choose_n       integer                     -- optional: choose N courses (alternative way to model)
+);
+
+-- Mapping from bucket to courses
+create table if not exists degree_group_course (
+  group_code   text not null references degree_group(code) on delete cascade,
+  course_code  text not null references course(code) on delete cascade,
+  primary key (group_code, course_code)
+);

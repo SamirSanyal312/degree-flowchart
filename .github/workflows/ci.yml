@@ -29,6 +29,15 @@ jobs:
           java-version: '21'
           cache: 'maven'
 
+      - name: Ensure mvnw is runnable on Linux
+        run: |
+        # strip any Windows CRLF just in case
+          sed -i 's/\r$//' mvnw
+        # set executable bit for this runner
+          chmod +x mvnw
+        # show what it is now
+          ls -l mvnw
+
       - name: Run unit tests
         run: ./mvnw -B -ntp test
 

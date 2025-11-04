@@ -221,65 +221,120 @@
   });
   
   function showCourseDetail(courseNode) {
-    const isPlanned = plannedSet.has(courseNode.code);
-    const displayStatus = isPlanned ? 'planned' : courseNode.status.toLowerCase();
-    
-    courseDetailTitle.textContent = courseNode.code;
-    
-    // Build prerequisites list
-    let prereqHTML = '<p class="muted">None</p>';
-    if (courseNode.unmet && courseNode.unmet.length > 0) {
-      const allPrereqs = edges.filter(e => e.to === courseNode.code).map(e => e.from);
-      const metPrereqs = allPrereqs.filter(p => !courseNode.unmet.includes(p));
-      
-      prereqHTML = '<ul class="prereq-list">';
-      allPrereqs.forEach(prereq => {
-        const isMet = metPrereqs.includes(prereq);
-        prereqHTML += `<li>${prereq} ${isMet ? '✓' : '✗'}</li>`;
-      });
-      prereqHTML += '</ul>';
-    } else if (edges.some(e => e.to === courseNode.code)) {
-      const allPrereqs = edges.filter(e => e.to === courseNode.code).map(e => e.from);
-      prereqHTML = '<ul class="prereq-list">';
-      allPrereqs.forEach(prereq => {
-        prereqHTML += `<li>${prereq} ✓</li>`;
-      });
-      prereqHTML += '</ul>';
-    }
-    
-    const statusLabels = {
-      'completed': 'Completed',
-      'eligible': 'Eligible',
-      'locked': 'Locked',
-      'planned': 'Planned'
-    };
-    
-    courseDetailContent.innerHTML = `
-      <div class="detail-section">
-        <h3>Course Information</h3>
-        <p><strong>Title:</strong> ${courseNode.title}</p>
-        <p><strong>Credits:</strong> ${courseNode.credits}</p>
-        <p><strong>Type:</strong> ${courseNode.core ? 'Core Course' : 'Elective'}</p>
-        <p><strong>Status:</strong> <span class="status-badge ${displayStatus}">${statusLabels[displayStatus]}</span></p>
-      </div>
-      
-      <div class="detail-section">
-        <h3>Prerequisites</h3>
-        ${prereqHTML}
-      </div>
-      
-      ${courseNode.unmet && courseNode.unmet.length > 0 ? `
+  const isPlanned = plannedSet.has(courseNode.code);
+  const displayStatus = isPlanned ? 'planned' : courseNode.status.toLowerCase();
+
+  courseDetailTitle.textContent = courseNode.code;
+
+  // Build prerequisites list
+  let prereqHTML = '<p class="muted">None</p>';
+  if (courseNode.unmet && courseNode.unmet.length > 0) {
+    const allPrereqs = edges.filter(e => e.to === courseNode.code).map(e => e.from);
+    const metPrereqs = allPrereqs.filter(p => !courseNode.unmet.includes(p));
+    prereqHTML = '<ul class="prereq-list">';
+    allPrereqs.forEach(prereq => {
+      const isMet = metPrereqs.includes(prereq);
+      prereqHTML += `<li>${prereq} ${isMet ? '✓' : '✗'}</li>`;
+    });
+    prereqHTML += '</ul>';
+  } else if (edges.some(e => e.to === courseNode.code)) {
+    const allPrereqs = edges.filter(e => e.to === courseNode.code).map(e => e.from);
+    prereqHTML = '<ul class="prereq-list">';
+    allPrereqs.forEach(prereq => { prereqHTML += `<li>${prereq} ✓</li>`; });
+    prereqHTML += '</ul>';
+  }
+
+  const statusLabels = {
+    'completed': 'Completed',
+    'eligible': 'Eligible',
+    'locked': 'Locked',
+    'planned': 'Planned'
+  };
+
+  // Render base detail sections + a placeholder div for actions
+  courseDetailContent.innerHTML = `
+    <div class="detail-section">
+      <h3>Course Information</h3>
+      <p><strong>Title:</strong> ${courseNode.title}</p>
+      <p><strong>Credits:</strong> ${courseNode.credits}</p>
+      <p><strong>Type:</strong> ${courseNode.core ? 'Core Course' : 'Elective'}</p>
+      <p><strong>Status:</strong> 
+        <span class="status-badge ${displayStatus}">${statusLabels[displayStatus]}</span>
+      </p>
+    </div>
+
+    <div class="detail-section">
+      <h3>Prerequisites</h3>
+      ${prereqHTML}
+    </div>
+
+    ${courseNode.unmet && courseNode.unmet.length > 0 ? `
       <div class="detail-section" style="background:#fef2f2;border:1px solid #fecaca">
         <h3 style="color:#b91c1c">Missing Prerequisites</h3>
         <p class="danger-text">Complete these courses first: ${courseNode.unmet.join(', ')}</p>
       </div>
-      ` : ''}
-    `;
-    
-    courseDetailModal.style.display = 'flex';
-    courseDetailModal.setAttribute('aria-hidden', 'false');
+    ` : ''}
+
+    <div id="detail-plan-actions" class="detail-section">
+      <h3>Plan this course</h3>
+      <div id="detail-plan-row"></div>
+      <div id="detail-plan-error" class="danger-text" style="display:none;margin-top:6px;"></div>
+    </div>
+  `;
+
+  // Build the planning control:
+  // Show only when not completed/planned AND status is ELIGIBLE
+  const canPlan = !isPlanned && courseNode.status === 'ELIGIBLE';
+  const row = document.getElementById('detail-plan-row');
+  const err = document.getElementById('detail-plan-error');
+
+  if (!canPlan) {
+    // Explain why it can’t be planned from here
+    let why = 'This course cannot be planned from here.';
+    if (isPlanned)     why = 'Already planned.';
+    if (displayStatus === 'completed') why = 'Already completed.';
+    if (displayStatus === 'locked')    why = 'Locked (prerequisites not satisfied).';
+    row.innerHTML = `<p class="muted">${why}</p>`;
+  } else {
+    // Semesters that are not read-only
+    const editableSems = (Array.isArray(SERVER_SEMS) ? SERVER_SEMS : []).filter(s => !s.readOnly);
+    if (editableSems.length === 0) {
+      row.innerHTML = `<p class="muted">No editable semesters available for planning.</p>`;
+    } else {
+      // Dropdown + button
+      const select = document.createElement('select');
+      select.style.marginRight = '8px';
+      editableSems.forEach(s => {
+        const season = (s.num % 2 === 1) ? 'Fall' : 'Spring';
+        const opt = document.createElement('option');
+        opt.value = s.num;
+        opt.textContent = `Sem ${s.num} • ${season}`;
+        select.appendChild(opt);
+      });
+
+      const btn = document.createElement('button');
+      btn.textContent = 'Plan';
+      btn.addEventListener('click', async () => {
+        err.style.display = 'none'; err.textContent = '';
+        btn.disabled = true;
+        try {
+          await planCourseInSemester(courseNode.code, Number(select.value));
+          location.reload(); // keep consistent with planner UX
+        } catch (e) {
+          err.textContent = e?.message || 'Failed to plan this course';
+          err.style.display = 'block';
+        } finally {
+          btn.disabled = false;
+        }
+      });
+
+      row.append(select, btn);
+    }
   }
 
+  courseDetailModal.style.display = 'flex';
+  courseDetailModal.setAttribute('aria-hidden', 'false');
+}
   // ====== edges ======
   const NS='http://www.w3.org/2000/svg';
   const defs=document.createElementNS(NS,'defs');
@@ -418,6 +473,26 @@
   setTimeout(scheduleDraw, 80);
 
   // ====== Planner dialog ======
+  async function planCourseInSemester(courseCode, semesterNo) {
+  const token  = document.querySelector('meta[name="_csrf"]')?.content;
+  const header = document.querySelector('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN';
+
+  const res = await fetch('/api/plan', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { [header]: token } : {})
+    },
+    body: JSON.stringify({ semesterNo, courseCodes: [courseCode] })
+  });
+
+  // Expect the same JSON shape used in the semester planner
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.status === 'error') {
+    throw new Error(data.message || 'Failed to plan');
+  }
+  return data;
+}
   const backdrop = document.getElementById('plannerBackdrop');
   const courseList = document.getElementById('courseList');
   const creditCount = document.getElementById('creditCount');

@@ -14,7 +14,7 @@
       --ok:#2e7d32; --ok-bg:#e8f5e9;
       --el:#1565c0; --el-bg:#e3f2fd;
       --lo:#9e9e9e; --lo-bg:#f4f4f5;
-      --plan:#b00020; --plan-bg:#fdecea;  /* NEW: planned (red) */
+      --plan:#b00020; --plan-bg:#fdecea;
       --ink:#181818; --muted:#636c76;
       --danger:#b00020;
     }
@@ -29,7 +29,7 @@
     .legend .ok i{background:var(--ok)}
     .legend .el i{background:var(--el)}
     .legend .lo i{background:var(--lo)}
-    .legend .pl i{background:var(--plan)} /* NEW */
+    .legend .pl i{background:var(--plan)}
 
     .top-actions{display:flex;gap:12px}
     #summary{display:flex;gap:12px;align-items:center;margin:8px 0 14px;flex-wrap:wrap}
@@ -43,27 +43,28 @@
     #board{position:relative;min-height:520px;background:#fafafa;border:1px solid #eee;border-radius:12px}
     #flow-canvas{position:absolute;inset:0;overflow:visible}
     .node{position:absolute;width:260px;padding:14px 16px;border-radius:12px;border:2px solid transparent;
-           box-shadow:0 8px 24px rgba(0,0,0,.06); user-select:none; cursor:grab}
+           box-shadow:0 8px 24px rgba(0,0,0,.06); user-select:none; cursor:pointer; transition:transform 0.15s ease, box-shadow 0.15s ease}
+    .node:hover{transform:translateY(-2px);box-shadow:0 12px 32px rgba(0,0,0,.12)}
     .node:active{cursor:grabbing}
     .node h3{margin:0 0 8px;font-size:16px}
     .meta{font-size:12px;color:var(--muted)}
     .completed{background:var(--ok-bg);border-color:var(--ok)}
     .eligible{background:var(--el-bg);border-color:var(--el)}
     .locked{background:var(--lo-bg);border-color:var(--lo)}
-    .planned{background:var(--plan-bg);border-color:var(--plan)} /* NEW */
+    .planned{background:var(--plan-bg);border-color:var(--plan)}
 
     .edge{stroke:#b6b6b6;stroke-width:1.5;fill:none}
     .edge.ok{stroke:var(--ok)}
     .edge.eligible{stroke:var(--el)}
     .edge.locked{stroke:#e57373}
-    .edge.planned{stroke:var(--plan)}         /* NEW */
+    .edge.planned{stroke:var(--plan)}
 
     .hint{color:var(--muted);font-size:12px;margin-top:8px}
     button{padding:8px 12px;border:1px solid #ddd;border-radius:8px;background:white;cursor:pointer}
     .danger{color:#fff;background:var(--danger);border-color:#9a001b}
     .danger:hover{filter:brightness(0.98)}
 
-    /* planner dialog */
+    /* Modal styles */
     .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.25);display:none;align-items:center;justify-content:center;z-index:10}
     .modal{background:#fff;border-radius:12px;border:1px solid #eee;max-width:720px;width:92%;padding:16px 18px;box-shadow:0 10px 30px rgba(0,0,0,.15)}
     .modal header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
@@ -75,6 +76,19 @@
     .actions{display:flex;gap:10px;justify-content:flex-end;margin-top:12px}
     .danger-text{color:var(--danger)}
     .muted{color:#6b7280}
+
+    /* Course detail modal styles */
+    #courseDetailModal .modal{max-width:500px}
+    #courseDetailModal .detail-section{margin:12px 0;padding:12px;background:#f9fafb;border-radius:8px}
+    #courseDetailModal .detail-section h3{margin:0 0 8px;font-size:14px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px}
+    #courseDetailModal .detail-section p{margin:4px 0;font-size:14px}
+    #courseDetailModal .prereq-list{list-style:none;padding:0;margin:8px 0}
+    #courseDetailModal .prereq-list li{padding:4px 8px;margin:4px 0;background:#fff;border:1px solid #e5e7eb;border-radius:6px;font-size:13px}
+    #courseDetailModal .status-badge{display:inline-block;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600;margin-left:8px}
+    #courseDetailModal .status-badge.completed{background:var(--ok-bg);color:var(--ok)}
+    #courseDetailModal .status-badge.eligible{background:var(--el-bg);color:var(--el)}
+    #courseDetailModal .status-badge.locked{background:var(--lo-bg);color:var(--lo)}
+    #courseDetailModal .status-badge.planned{background:var(--plan-bg);color:var(--plan)}
   </style>
 </head>
 <body>
@@ -87,7 +101,7 @@
         <span class="ok"><i></i>Completed</span>
         <span class="el"><i></i>Eligible</span>
         <span class="lo"><i></i>Locked</span>
-        <span class="pl"><i></i>Planned</span> <!-- NEW -->
+        <span class="pl"><i></i>Planned</span>
       </div>
     </div>
     <div class="top-actions">
@@ -108,7 +122,7 @@
   <div id="board">
     <svg id="flow-canvas" width="1200" height="600" role="img" aria-label="Degree requirements flow chart"></svg>
   </div>
-  <p class="hint">Tip: drag cards, wheel to zoom (Ctrl/Cmd + +/- also works). Edges update live.</p>
+  <p class="hint">Tip: Click a course card to view details. Drag cards to rearrange, wheel to zoom (Ctrl/Cmd + +/- also works).</p>
 </div>
 
 <!-- Planner modal -->
@@ -128,6 +142,17 @@
   </div>
 </div>
 
+<!-- Course detail modal -->
+<div id="courseDetailModal" class="modal-backdrop" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="courseDetailTitle">
+    <header>
+      <h2 id="courseDetailTitle">Course Details</h2>
+      <button id="closeCourseDetail" type="button">Close</button>
+    </header>
+    <div id="courseDetailContent"></div>
+  </div>
+</div>
+
 <!-- Server data -->
 <script th:inline="javascript">
 /*<![CDATA[*/
@@ -136,7 +161,7 @@
   const SERVER_SEMS     = /*[[${semesters}]]*/ [];
   const SERVER_PROGRESS = /*[[${progress}]]*/ null;
   const SERVER_GROUPS   = /*[[${groups}]]*/ [];
-  const SERVER_PLANNED  = /*[[${plannedCodes}]]*/ [];   // NEW: array of course codes currently planned
+  const SERVER_PLANNED  = /*[[${plannedCodes}]]*/ [];
 /*]]>*/
 </script>
 
@@ -160,20 +185,100 @@
   // ====== cards ======
   const cardByCode = new Map();
   function statusClass(s){ return s==='COMPLETED'?'completed':(s==='ELIGIBLE'?'eligible':'locked'); }
+  
   function createCard(n){
     const d = document.createElement('div');
     const baseStatus = statusClass(n.status);
     const isPlanned  = plannedSet.has(n.code);
-    d.className = `node ${isPlanned ? 'planned' : baseStatus}`;  // NEW: planned wins
+    d.className = `node ${isPlanned ? 'planned' : baseStatus}`;
     d.dataset.code=n.code; d.dataset.status=(isPlanned?'planned':baseStatus);
     d.style.left = (40 + (n.col-1)*300) + 'px'; d.style.top = (40 + n.row*140) + 'px';
     const h3 = d.appendChild(document.createElement('h3')); h3.textContent=n.code;
     const p = d.appendChild(document.createElement('p'));  p.textContent=n.title;
     const m = d.appendChild(document.createElement('div')); m.className='meta'; m.textContent=`${n.credits} cr • ${n.core?'Core':'Elective'}`;
     if (n.unmet?.length) d.title = `Missing: ${n.unmet.join(', ')}`;
+    
+    // Add click handler for course details
+    d.addEventListener('click', (e) => {
+      // Only show details if not dragging
+      if (!d.dataset.isDragging) {
+        showCourseDetail(n);
+      }
+    });
+    
     board.appendChild(d); cardByCode.set(n.code, d); makeDraggable(d); return d;
   }
   nodes.forEach(createCard);
+
+  // ====== Course Detail Modal ======
+  const courseDetailModal = document.getElementById('courseDetailModal');
+  const courseDetailContent = document.getElementById('courseDetailContent');
+  const courseDetailTitle = document.getElementById('courseDetailTitle');
+  
+  document.getElementById('closeCourseDetail').addEventListener('click', () => {
+    courseDetailModal.style.display = 'none';
+    courseDetailModal.setAttribute('aria-hidden', 'true');
+  });
+  
+  function showCourseDetail(courseNode) {
+    const isPlanned = plannedSet.has(courseNode.code);
+    const displayStatus = isPlanned ? 'planned' : courseNode.status.toLowerCase();
+    
+    courseDetailTitle.textContent = courseNode.code;
+    
+    // Build prerequisites list
+    let prereqHTML = '<p class="muted">None</p>';
+    if (courseNode.unmet && courseNode.unmet.length > 0) {
+      const allPrereqs = edges.filter(e => e.to === courseNode.code).map(e => e.from);
+      const metPrereqs = allPrereqs.filter(p => !courseNode.unmet.includes(p));
+      
+      prereqHTML = '<ul class="prereq-list">';
+      allPrereqs.forEach(prereq => {
+        const isMet = metPrereqs.includes(prereq);
+        prereqHTML += `<li>${prereq} ${isMet ? '✓' : '✗'}</li>`;
+      });
+      prereqHTML += '</ul>';
+    } else if (edges.some(e => e.to === courseNode.code)) {
+      const allPrereqs = edges.filter(e => e.to === courseNode.code).map(e => e.from);
+      prereqHTML = '<ul class="prereq-list">';
+      allPrereqs.forEach(prereq => {
+        prereqHTML += `<li>${prereq} ✓</li>`;
+      });
+      prereqHTML += '</ul>';
+    }
+    
+    const statusLabels = {
+      'completed': 'Completed',
+      'eligible': 'Eligible',
+      'locked': 'Locked',
+      'planned': 'Planned'
+    };
+    
+    courseDetailContent.innerHTML = `
+      <div class="detail-section">
+        <h3>Course Information</h3>
+        <p><strong>Title:</strong> ${courseNode.title}</p>
+        <p><strong>Credits:</strong> ${courseNode.credits}</p>
+        <p><strong>Type:</strong> ${courseNode.core ? 'Core Course' : 'Elective'}</p>
+        <p><strong>Status:</strong> <span class="status-badge ${displayStatus}">${statusLabels[displayStatus]}</span></p>
+      </div>
+      
+      <div class="detail-section">
+        <h3>Prerequisites</h3>
+        ${prereqHTML}
+      </div>
+      
+      ${courseNode.unmet && courseNode.unmet.length > 0 ? `
+      <div class="detail-section" style="background:#fef2f2;border:1px solid #fecaca">
+        <h3 style="color:#b91c1c">Missing Prerequisites</h3>
+        <p class="danger-text">Complete these courses first: ${courseNode.unmet.join(', ')}</p>
+      </div>
+      ` : ''}
+    `;
+    
+    courseDetailModal.style.display = 'flex';
+    courseDetailModal.setAttribute('aria-hidden', 'false');
+  }
 
   // ====== edges ======
   const NS='http://www.w3.org/2000/svg';
@@ -186,7 +291,7 @@
     <marker id="arrow-locked" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M 0 0 L 10 5 L 0 10 z" fill="#e57373"></path></marker>
     <marker id="arrow-planned" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M 0 0 L 10 5 L 0 10 z" fill="#b00020"></path></marker>`;   /* NEW */
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#b00020"></path></marker>`;
   svg.appendChild(defs);
   const edgesG=document.createElementNS(NS,'g'); edgesG.setAttribute('id','edges-layer'); svg.appendChild(edgesG);
 
@@ -197,7 +302,7 @@
 
   function edgeStyle(targetEl){
     const st=targetEl?.dataset.status||'locked';
-    if (st==='planned') return {cls:'edge planned','marker':'url(#arrow-planned)'};   // NEW
+    if (st==='planned') return {cls:'edge planned','marker':'url(#arrow-planned)'};
     if (st==='completed') return {cls:'edge ok','marker':'url(#arrow-ok)'};
     if (st==='eligible')  return {cls:'edge eligible','marker':'url(#arrow-eligible)'};
     return {cls:'edge locked','marker':'url(#arrow-locked)'};
@@ -219,14 +324,41 @@
   }
 
   function makeDraggable(el){
-    let start, origin;
-    function onMove(e){ el.style.left=(origin.x+(e.clientX-start.x))+'px'; el.style.top=(origin.y+(e.clientY-start.y))+'px'; scheduleDraw(); }
-    function onUp(){ const g=20; el.style.left=(Math.round(parseInt(el.style.left||'0',10)/g)*g)+'px'; el.style.top=(Math.round(parseInt(el.style.top||'0',10)/g)*g)+'px'; window.removeEventListener('mousemove',onMove); scheduleDraw(); }
-    el.addEventListener('mousedown',e=>{ const r=el.getBoundingClientRect(), b=boardRect(); start={x:e.clientX,y:e.clientY}; origin={x:r.left-b.left,y:r.top-b.top};
-      el.style.position='absolute'; el.style.left=origin.x+'px'; el.style.top=origin.y+'px'; el.style.zIndex=2; window.addEventListener('mousemove',onMove); window.addEventListener('mouseup',onUp,{once:true}); e.preventDefault(); });
+    let start, origin, hasMoved;
+    function onMove(e){ 
+      hasMoved = true;
+      el.dataset.isDragging = 'true';
+      el.style.left=(origin.x+(e.clientX-start.x))+'px'; 
+      el.style.top=(origin.y+(e.clientY-start.y))+'px'; 
+      scheduleDraw(); 
+    }
+    function onUp(){ 
+      const g=20; 
+      el.style.left=(Math.round(parseInt(el.style.left||'0',10)/g)*g)+'px'; 
+      el.style.top=(Math.round(parseInt(el.style.top||'0',10)/g)*g)+'px'; 
+      window.removeEventListener('mousemove',onMove); 
+      scheduleDraw(); 
+      // Small delay to prevent click event from firing after drag
+      setTimeout(() => {
+        delete el.dataset.isDragging;
+      }, 100);
+    }
+    el.addEventListener('mousedown',e=>{ 
+      hasMoved = false;
+      const r=el.getBoundingClientRect(), b=boardRect(); 
+      start={x:e.clientX,y:e.clientY}; 
+      origin={x:r.left-b.left,y:r.top-b.top};
+      el.style.position='absolute'; 
+      el.style.left=origin.x+'px'; 
+      el.style.top=origin.y+'px'; 
+      el.style.zIndex=2; 
+      window.addEventListener('mousemove',onMove); 
+      window.addEventListener('mouseup',onUp,{once:true}); 
+      e.preventDefault(); 
+    });
   }
 
-  // ====== summary UI stays the same (omitted for brevity) ======
+  // ====== summary UI ======
   (function(){
     const pill=document.getElementById('progress-pill');
     const gchips=document.getElementById('group-chips');
@@ -269,7 +401,7 @@
     }
   })();
 
-  // ====== Reset layout/plan and Fit (unchanged) ======
+  // ====== Reset layout/plan and Fit ======
   document.getElementById('resetLayout').addEventListener('click',()=>{ try{localStorage.removeItem('degree-flow:layout:v1');}catch{} location.reload(); });
   document.getElementById('resetPlan').addEventListener('click',()=>{
     if(!confirm('Clear ALL planned courses for this account?')) return;
@@ -285,7 +417,7 @@
   new ResizeObserver(scheduleDraw).observe(board);
   setTimeout(scheduleDraw, 80);
 
-  // ====== Planner dialog (unchanged save/reload) ======
+  // ====== Planner dialog ======
   const backdrop = document.getElementById('plannerBackdrop');
   const courseList = document.getElementById('courseList');
   const creditCount = document.getElementById('creditCount');
@@ -310,7 +442,7 @@
     function refresh(){ total=[...selected].reduce((s,c)=>s+(creditBy.get(c)||0),0); creditCount.textContent = `${total} credits`; saveBtn.disabled=!(total>=3 && total<=9); }
     items.forEach(it=>{
       const row=document.createElement('div'); row.className='course-row';
-      const left=document.createElement('div'); left.innerHTML = `<strong>${it.code}</strong> — ${it.title}`;
+      const left=document.createElement('div'); left.innerHTML = `<strong>${it.code}</strong> – ${it.title}`;
       const right=document.createElement('div'); right.innerHTML = `<span class="pill">${it.credits} cr • ${it.core?'Core':'Elective'}</span>`;
       const cb=document.createElement('input'); cb.type='checkbox'; cb.style.marginRight='8px';
       cb.addEventListener('change',()=>{ if(cb.checked) selected.add(it.code); else selected.delete(it.code); refresh(); });
@@ -330,7 +462,6 @@
       }).then(async r=>{
         const data = await r.json().catch(()=>({}));
         if (!r.ok || data.status==='error'){ throw new Error(data.message || 'Save failed'); }
-        // After saving, reload so SERVER_PLANNED updates and nodes show red
         location.reload();
       }).catch(err=>{
         plannerError.textContent = err.message || 'Save failed';
